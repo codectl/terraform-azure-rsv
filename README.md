@@ -1,0 +1,318 @@
+# Recovery Service Vault
+
+This terraform module streamlines the setup and management of azure recovery services vaults, offering tailored options for backup policies.
+
+## Features
+
+Enables creation of multiple policies for file shares and VMs
+
+Utilization of terratest for robust validation
+
+Integrates seamlessly with private endpoint capabilities for direct and secure connectivity
+
+Simplifies item policy association
+
+Offers three-tier naming hierarchy (explicit, convention-based, or key-based) for flexible resource management.
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+The following requirements are needed by this module:
+
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.0)
+
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 5.0)
+
+## Providers
+
+The following providers are used by this module:
+
+- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (~> 5.0)
+
+## Resources
+
+The following resources are used by this module:
+
+- [azurerm_backup_container_storage_account.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/backup_container_storage_account) (resource)
+- [azurerm_backup_policy_file_share.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/backup_policy_file_share) (resource)
+- [azurerm_backup_policy_vm.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/backup_policy_vm) (resource)
+- [azurerm_backup_policy_vm_workload.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/backup_policy_vm_workload) (resource)
+- [azurerm_backup_protected_file_share.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/backup_protected_file_share) (resource)
+- [azurerm_backup_protected_vm.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/backup_protected_vm) (resource)
+- [azurerm_recovery_services_vault.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/recovery_services_vault) (resource)
+
+## Required Inputs
+
+The following input variables are required:
+
+### <a name="input_vault"></a> [vault](#input\_vault)
+
+Description: Contains all recovery services vault configuration
+
+Type:
+
+```hcl
+object({
+    name                               = string
+    resource_group_name                = optional(string)
+    location                           = optional(string)
+    sku                                = optional(string, "Standard")
+    immutability                       = optional(string)
+    cross_region_restore_enabled       = optional(bool)
+    storage_mode_type                  = optional(string)
+    public_network_access_enabled      = optional(bool)
+    classic_vmware_replication_enabled = optional(bool, false)
+    tags                               = optional(map(string))
+    identity = optional(object({
+      type         = string
+      identity_ids = optional(set(string), [])
+    }), null)
+    encryption = optional(object({
+      key_id                            = string
+      infrastructure_encryption_enabled = bool
+      user_assigned_identity_id         = optional(string)
+      use_system_assigned_identity      = optional(bool)
+    }), null)
+    monitoring = optional(object({
+      alerts_for_all_job_failures_enabled            = optional(bool)
+      alerts_for_critical_operation_failures_enabled = optional(bool)
+      alerts_for_all_failover_issues_enabled         = optional(bool)
+      alerts_for_all_replication_issues_enabled      = optional(bool)
+      email_notifications_for_site_recovery_enabled  = optional(bool)
+    }), null)
+    policies = optional(object({
+      file_shares = optional(map(object({
+        name                       = optional(string)
+        timezone                   = optional(string)
+        backup_tier                = optional(string)
+        snapshot_retention_in_days = optional(number)
+        backup = object({
+          frequency = string
+          time      = optional(string)
+          hourly = optional(object({
+            interval        = number
+            start_time      = string
+            window_duration = number
+          }), null)
+        })
+        retention = object({
+          daily = object({
+            count = number
+          })
+          weekly = optional(object({
+            count    = optional(number)
+            weekdays = optional(set(string), [])
+          }), null)
+          monthly = optional(object({
+            count             = optional(number)
+            weekdays          = optional(set(string))
+            weeks             = optional(set(string))
+            days              = optional(set(number))
+            include_last_days = optional(bool)
+          }), null)
+          yearly = optional(object({
+            count             = optional(number)
+            weekdays          = optional(set(string))
+            weeks             = optional(set(string))
+            months            = optional(set(string))
+            days              = optional(set(number))
+            include_last_days = optional(bool)
+          }), null)
+        })
+        protected_shares = optional(map(object({
+          name               = string
+          storage_account_id = string
+        })), {})
+      })), {})
+      vms = optional(map(object({
+        name                           = optional(string)
+        timezone                       = optional(string)
+        policy_type                    = optional(string)
+        consistency_type               = optional(string)
+        instant_restore_retention_days = optional(number)
+        instant_restore_resource_group = optional(object({
+          prefix = string
+          suffix = optional(string)
+        }), null)
+        tiering_policy = optional(object({
+          archived_restore_point = optional(object({
+            mode          = string
+            duration      = optional(number)
+            duration_type = optional(string)
+          }), null)
+        }), null)
+        backup = object({
+          frequency     = string
+          time          = string
+          hour_interval = optional(number)
+          hour_duration = optional(number)
+          weekdays      = optional(set(string))
+        })
+        retention = object({
+          daily = optional(object({
+            count = optional(number)
+          }), null)
+          weekly = optional(object({
+            count    = optional(number)
+            weekdays = optional(set(string))
+          }), null)
+          monthly = optional(object({
+            count             = optional(number)
+            weekdays          = optional(set(string))
+            weeks             = optional(set(string))
+            days              = optional(set(number))
+            include_last_days = optional(bool)
+          }), null)
+          yearly = optional(object({
+            count             = optional(number)
+            weekdays          = optional(set(string))
+            weeks             = optional(set(string))
+            months            = optional(set(string))
+            days              = optional(set(number))
+            include_last_days = optional(bool)
+          }), null)
+        })
+        protected_vms = optional(map(object({
+          id                = string
+          include_disk_luns = optional(list(number))
+          exclude_disk_luns = optional(list(number))
+          protection_state  = optional(string)
+        })), {})
+      })), {})
+      vm_workloads = optional(map(object({
+        name          = optional(string)
+        workload_type = string
+        settings = object({
+          time_zone           = string
+          compression_enabled = optional(bool)
+        })
+        protection_policies = map(object({
+          policy_type = string
+          backup = object({
+            frequency            = optional(string)
+            frequency_in_minutes = optional(number)
+            time                 = optional(string)
+            weekdays             = optional(set(string))
+          })
+          retention_daily = optional(object({
+            count = number
+          }), null)
+          retention_weekly = optional(object({
+            count    = number
+            weekdays = set(string)
+          }), null)
+          retention_monthly = optional(object({
+            count       = number
+            format_type = string
+            monthdays   = optional(set(number))
+            weekdays    = optional(set(string))
+            weeks       = optional(set(string))
+          }), null)
+          retention_yearly = optional(object({
+            count       = number
+            format_type = string
+            months      = set(string)
+            monthdays   = optional(set(number))
+            weekdays    = optional(set(string))
+            weeks       = optional(set(string))
+          }), null)
+          simple_retention = optional(object({
+            count = number
+          }), null)
+        }))
+      })), {})
+    }), {})
+  })
+```
+
+## Optional Inputs
+
+The following input variables are optional (have default values):
+
+### <a name="input_location"></a> [location](#input\_location)
+
+Description: default azure region to be used.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name)
+
+Description: default resource group to be used.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_tags"></a> [tags](#input\_tags)
+
+Description: tags to be added to the resources
+
+Type: `map(string)`
+
+Default: `{}`
+
+## Outputs
+
+The following outputs are exported:
+
+### <a name="output_container_storage_accounts"></a> [container\_storage\_accounts](#output\_container\_storage\_accounts)
+
+Description: Contains all backup container storage account configuration
+
+### <a name="output_policies_file_share"></a> [policies\_file\_share](#output\_policies\_file\_share)
+
+Description: Contains all file share backup policy configuration
+
+### <a name="output_policies_vm"></a> [policies\_vm](#output\_policies\_vm)
+
+Description: Contains all vm backup policy configuration
+
+### <a name="output_policies_vm_workload"></a> [policies\_vm\_workload](#output\_policies\_vm\_workload)
+
+Description: Contains all vm workload backup policy configuration
+
+### <a name="output_protected_file_shares"></a> [protected\_file\_shares](#output\_protected\_file\_shares)
+
+Description: Contains all backup protected file share configuration
+
+### <a name="output_protected_vms"></a> [protected\_vms](#output\_protected\_vms)
+
+Description: Contains all backup protected vm configuration
+
+### <a name="output_vault"></a> [vault](#output\_vault)
+
+Description: Contains all recovery services vault configuration
+<!-- END_TF_DOCS -->
+
+## Goals
+
+For more information, please see our [goals and non-goals](./GOALS.md).
+
+## Testing
+
+For more information, please see our testing [guidelines](./TESTING.md)
+
+## Notes
+
+Using a dedicated module, we've developed a naming convention for resources that's based on specific regular expressions for each type, ensuring correct abbreviations and offering flexibility with multiple prefixes and suffixes.
+
+Full examples detailing all usages, along with integrations with dependency modules, are located in the examples directory.
+
+To update the module's documentation run `make doc`
+
+## Contributors
+
+We welcome contributions from the community! Whether it's reporting a bug, suggesting a new feature, or submitting a pull request, your input is highly valued.
+
+For more information, please see our contribution [guidelines](./CONTRIBUTING.md).
+
+## License
+
+MIT Licensed. See [LICENSE](./LICENSE) for full details.
+
+## References
+
+- [Documentation](https://learn.microsoft.com/en-us/azure/backup/)
+- [Rest Api](https://learn.microsoft.com/en-us/rest/api/recoveryservices/)
